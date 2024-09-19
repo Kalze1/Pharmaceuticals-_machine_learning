@@ -1,31 +1,17 @@
 import pandas as pd
-import logging
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-
-#count the missing values and return the percentage of the messing values 
-def count_missing_values(df):
-    logging.info("Counting the missing values")
-    missing_count = df.isnull().sum()
-    missing_percentage = (missing_count / len(df)) * 100
-    message = f"Missing Values:\n{missing_count}\nMissing Percentage:\n{missing_percentage}"
-    logging.info(message)
-    return missing_count , missing_percentage
-
 
 # Function to handle missing values
 def handle_missing_values(df):
     # Fill missing CompetitionDistance with a large value (no nearby competition)
-    logging.info("Fill missing CompetitionDistance with a large value (no nearby competition)")
     df['CompetitionDistance'].fillna(df['CompetitionDistance'].max() + 1, inplace=True)
     
     # Fill missing CompetitionOpenSinceMonth and CompetitionOpenSinceYear with median values
-    logging.info("Fill missing competitionOpenSinceMonth and CompetitionOpenScinceYear with median vlaues")
     df['CompetitionOpenSinceMonth'].fillna(df['CompetitionOpenSinceMonth'].median(), inplace=True)
     df['CompetitionOpenSinceYear'].fillna(df['CompetitionOpenSinceYear'].median(), inplace=True)
     
     # Fill missing Promo2SinceWeek and Promo2SinceYear (no Promo2 participation)
-    logging.info("Fill missing Promo2SinceWeek and Promo2SinceYear (no promo2 participation)")
     df['Promo2SinceWeek'].fillna(0, inplace=True)
     df['Promo2SinceYear'].fillna(0, inplace=True)
     
@@ -34,15 +20,13 @@ def handle_missing_values(df):
 # Function to create new features based on competition and promo information
 def feature_engineering(df):
     # Create a feature 'CompetitionOpenSince' as a measure of competition age in months
-    logging.info("Crate a feature 'CompetitionOpenSince' as a measure of competition age in months")
     df['CompetitionOpenSince'] = (df['Date'].dt.year - df['CompetitionOpenSinceYear']) * 12 + \
                                   (df['Date'].dt.month - df['CompetitionOpenSinceMonth'])
     df['CompetitionOpenSince'] = df['CompetitionOpenSince'].apply(lambda x: max(x, 0))  # Handle negative values
 
     # Create a feature for Promo2 duration
-    logging.info("Creating a feature for Promo2 duration")
     df['Promo2Duration'] = (df['Date'].dt.year - df['Promo2SinceYear']) * 52 + \
-                           (df['Date'].dt.isocalendar().week - df['Promo2SinceWeek'])
+                           (df['Date'].dt.week - df['Promo2SinceWeek'])
     df['Promo2Duration'] = df['Promo2Duration'].apply(lambda x: max(x, 0))  # Handle negative values
 
     return df
@@ -52,7 +36,7 @@ def encode_categorical(df):
     # Label encode categorical columns
     label_encoders = {}
     categorical_columns = ['StateHoliday', 'StoreType', 'Assortment', 'PromoInterval']
-    logging.info("Encoding Columns 'StateHoliday', 'StoreType', 'Assortment', 'PromoInterval'")
+    
     for col in categorical_columns:
         le = LabelEncoder()
         df[col] = le.fit_transform(df[col].astype(str))  # Handle NA values by converting to string
@@ -62,7 +46,6 @@ def encode_categorical(df):
 
 # Function to extract features from the 'Date' column
 def extract_date_features(df):
-    logging.info("Extracting Date Futures from 'Date' to 'Year', 'Month', 'Day', 'WeekOfYear', 'DayOfyear', 'IsWeekend'")
     df['Year'] = df['Date'].dt.year
     df['Month'] = df['Date'].dt.month
     df['Day'] = df['Date'].dt.day
@@ -73,7 +56,6 @@ def extract_date_features(df):
 
 # Function to scale numerical features
 def scale_numerical(df, numerical_columns):
-    logging.info("Scaleing the Numurical features")
     scaler = StandardScaler()
     df[numerical_columns] = scaler.fit_transform(df[numerical_columns])
     return df, scaler
@@ -113,28 +95,31 @@ def handle_outliers(df, columns, method='cap'):
         
         if method == 'remove':
             # Remove outliers
-            logging.info("Removing Outliers")
             df = df[~(outliers_lower | outliers_upper)]
         
         elif method == 'cap':
             # Cap outliers to the lower and upper bounds
-            logging.info("Capping Outliers between lower bound and upper bound")
             df.loc[outliers_lower, col] = lower_bound
             df.loc[outliers_upper, col] = upper_bound
         
         elif method == 'impute':
             # Replace outliers with the median of the column
-            logging.info("Replacing Outliers with whe median of the column")
             median_value = df[col].median()
             df.loc[outliers_lower | outliers_upper, col] = median_value
         
     return df
 
+# Example usage:
+# Assuming 'train_data' is your dataset, and we want to handle outliers in 'Sales', 'Customers', and 'CompetitionDistance'.
+outlier_columns = ['Sales', 'Customers', 'CompetitionDistance']
+
+# Choose the method: 'remove', 'cap', or 'impute'
+# For example, we use 'cap' to cap outliers in these columns:
+train_data = handle_outliers(train_data, outlier_columns, method='cap')
 
 
 # Master preprocessing function
 def preprocess_data(df):
-    logging.info("Preprocessing is starting")
     # Convert 'Date' column to datetime
     df['Date'] = pd.to_datetime(df['Date'])
     
